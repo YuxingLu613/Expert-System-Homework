@@ -168,7 +168,6 @@ print('Development accuracy: {}'.format(dev_acc[-1]))
 
 import matplotlib.pyplot as plt
 
-# Loss curve
 plt.plot(train_loss)
 plt.plot(dev_loss)
 plt.title('Loss')
@@ -176,7 +175,6 @@ plt.legend(['train', 'dev'])
 plt.savefig('loss.png')
 plt.show()
 
-# Accuracy curve
 plt.plot(train_acc)
 plt.plot(dev_acc)
 plt.title('Accuracy')
@@ -184,8 +182,42 @@ plt.legend(['train', 'dev'])
 plt.savefig('acc.png')
 plt.show()
 
-predictions=_predict(X_test,w,b)
-with open("output.csv", "w") as f:
+predictions = _predict(X_test, w, b)
+with open("output_logistic.csv", "w") as f:
+    f.write('id,label\n')
+    for i, label in enumerate(predictions):
+        f.write('{},{}\n'.format(i, label))
+
+# -----------------------------------------------------------
+
+X_train_0 = np.array([x for x, y in zip(X_train, Y_train) if y == 0])
+X_train_1 = np.array([x for x, y in zip(X_train, Y_train) if y == 1])
+
+mean_0 = np.mean(X_train_0, axis=0)
+mean_1 = np.mean(X_train_1, axis=0)
+
+cov_0 = np.zeros((data_dim, data_dim))
+cov_1 = np.zeros((data_dim, data_dim))
+
+for x in X_train_0:
+    cov_0 += np.dot(np.transpose([x - mean_0]), [x - mean_0]) / X_train_0.shape[0]
+for x in X_train_1:
+    cov_1 += np.dot(np.transpose([x - mean_1]), [x - mean_1]) / X_train_1.shape[0]
+
+cov = (cov_0 * X_train_0.shape[0] + cov_1 * X_train_1.shape[0]) / (X_train_0.shape[0] + X_train_1.shape[0])
+
+u, s, v = np.linalg.svd(cov, full_matrices=False)
+inv = np.matmul(v.T * 1 / s, u.T)
+
+w = np.dot(inv, mean_0 - mean_1)
+b = (-0.5) * np.dot(mean_0, np.dot(inv, mean_0)) + 0.5 * np.dot(mean_1, np.dot(inv, mean_1)) \
+    + np.log(float(X_train_0.shape[0]) / X_train_1.shape[0])
+
+Y_train_pred = 1 - _predict(X_train, w, b)
+print('Training accuracy: {}'.format(_accuracy(Y_train_pred, Y_train)))
+
+predictions = 1 - _predict(X_test, w, b)
+with open("output_generative.csv", 'w') as f:
     f.write('id,label\n')
     for i, label in enumerate(predictions):
         f.write('{},{}\n'.format(i, label))
